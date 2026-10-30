@@ -11,4 +11,9 @@ export default defineConfig({
   image: { domains: ['static.wixstatic.com'] },
   security: { checkOrigin: false },
   devToolbar: { enabled: false },
+  vite: {
+    server:{
+      cors: true
+    }
+  }
 });

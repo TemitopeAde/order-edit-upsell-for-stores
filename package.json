@@ -12,19 +12,24 @@
     "release": "wix release",
     "generate": "wix generate",
     "skills": "wix skills",
-    "typecheck": "astro check"
+    "typecheck": "astro check",
+    "permissions:sync": "npx tsx scripts/manage-permissions.ts"
   },
   "dependencies": {
+    "@types/node": "^26.6.6",
     "@wix/astro": "^2.75.3",
     "@wix/dashboard": "^1.3.43",
     "@wix/data": "^1.0.539",
     "@wix/design-system": "^1.154.0",
     "@wix/ecom": "^1.0.2622",
+    "@wix/email-transmissions": "^1.0.13",
     "@wix/essentials": "^0.1.23",
     "@wix/sdk": "^1.21.18",
     "astro": "^5.8.0",
+    "clsx": "^2.1.1",
     "lucide-react": "^1.65.0",
     "sonner": "^2.0.8",
+    "tailwind-merge": "^3.7.0",
     "typescript": "^5.8.3",
     "zod": "^4.6.7"
   },

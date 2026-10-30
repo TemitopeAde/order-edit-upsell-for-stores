@@ -846,7 +846,17 @@ current Wix docs before implementation.
 ### 10.4 Wix authentication and permissions
 
 Use Wix CLI app authentication and the supported authenticated request
-helper (`fetchWithAuth`) for server-side Wix API calls.
+helper (`fetchWithAuth`) for all communications:
+
+-   **Frontend-to-Backend Astro Endpoints**: Extensions (Site Plugins,
+    Dashboard Pages) must call backend Astro routes under `/api/*` using
+    `httpClient.fetchWithAuth()` from `@wix/essentials` (with endpoint URLs
+    resolved via `new URL(path, import.meta.url).href`) instead of plain
+    `fetch`. This ensures caller authentication tokens and Wix context
+    are attached, and prevents requests on storefront pages from erroneously
+    resolving to the merchant site's domain.
+-   **Server-to-Wix API**: Use `fetchWithAuth` / elevated SDK clients for
+    server-side Wix platform API calls.
 
 Request only the required scopes, but note that the Order Payment
 Requests API currently requires the broad
