@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "skills": {
+    "wix-app": {
+      "source": "./node_modules/@wix/agent-skills",
+      "sourceType": "local",
+      "computedHash": "c392eb33f6e23dec01e2a8d46a87a35eb5f0ebde8cfe125e7db984c6cb6e113f"
+    },
+    "wix-design-system": {
+      "source": "./node_modules/@wix/agent-skills",
+      "sourceType": "local",
+      "computedHash": "47da8b5791959362c730a630c9893473a7e7fa645bbe93b63b306df2ddccbbaf"
+    },
+    "wix-docs": {
+      "source": "./node_modules/@wix/agent-skills",
+      "sourceType": "local",
+      "computedHash": "dbb896c27633806aba7632e0c944784d2f4437c7d94aa12f14ae0ef401011e8f"
+    },
+    "wix-headless-kit": {
+      "source": "./node_modules/@wix/agent-skills",
+      "sourceType": "local",
+      "computedHash": "c0d15cc3c96a0c2d23cc6305f39940705dcdafea38e14f4c5b01ac419e11805b"
+    },
+    "wix-headless-templates": {
+      "source": "./node_modules/@wix/agent-skills",
+      "sourceType": "local",
+      "computedHash": "08ef6f848cbef4f3153edd5b770acb2449e4984483962e7e50b57a8fc7c0833b"
+    },
+    "wix-manage": {
+      "source": "./node_modules/@wix/agent-skills",
+      "sourceType": "local",
+      "computedHash": "1c25b440e2d3fa0511b55f8c5b9fb191c32171f4d0abcc44c6a1f01847324cea"
+    },
+    "wix-readme": {
+      "source": "./node_modules/@wix/agent-skills",
+      "sourceType": "local",
+      "computedHash": "ec2b6c46f8f3494e23d17279e55d5eb33adf4b5b892f0e2d154d94d488046258"
+    }
+  }
+}
