@@ -1,4 +1,3 @@
-import { logger } from '../logger';
 import { WixDataRepository } from '../db/wixDataRepository';
 import { orderService } from '../orders/orderService';
 import {
@@ -60,7 +59,7 @@ export class SessionManager {
     }
 
     // Check order draftability and eligibility
-    const eligibility = await orderService.checkEligibility(orderId, settings);
+    const eligibility = await orderService.checkEligibility(orderId, settings, undefined, siteId);
     if (!eligibility.draftable) {
       return { eligible: false, reason: eligibility.reason || 'Order is not eligible for modification', settings };
     }
@@ -111,28 +110,6 @@ export class SessionManager {
       status: 'SUCCESS',
       metadata: { originalOrderTotal: newSession.originalOrderTotal },
     });
-
-    // Automatically send email transmission to notify customer if enabled
-    if (settings.sendCustomerEmailOnOrder && newSession.customerEmail) {
-      import('../email/emailTransmissionService')
-        .then(({ emailTransmissionService }) => {
-          emailTransmissionService
-            .sendOrderEditNotification({
-              siteId,
-              orderId,
-              orderNumber: newSession.orderNumber,
-              customerEmail: newSession.customerEmail!,
-              editingDeadline: newSession.editingDeadline,
-              editingWindowMinutes: settings.editingWindowMinutes,
-              items: newSession.originalLineItemsSnapshot,
-              currency: newSession.currency,
-              total: newSession.originalOrderTotal,
-              sessionId: newSession._id,
-            })
-            .catch((err) => logger.error('Failed to send auto email notification on session init', err));
-        })
-        .catch((err) => logger.error('Failed to import email transmission service', err));
-    }
 
     return { eligible: true, session: newSession, settings };
   }

@@ -1,5 +1,9 @@
+import { orders } from '@wix/ecom';
+import { auth } from '@wix/essentials';
 import { logger } from '../logger';
 import { type OrderLineItem, type OrderEditorSettings } from '../../types/schemas';
+
+const getOrder = auth.elevate(orders.getOrder);
 
 export interface OrderDraftabilityResult {
   draftable: boolean;
@@ -19,12 +23,13 @@ export class OrderService {
   async checkEligibility(
     orderId: string,
     settings: OrderEditorSettings,
-    providedCustomerToken?: string
+    providedCustomerToken?: string,
+    siteId = 'default-site',
   ): Promise<OrderDraftabilityResult> {
     logger.info('Evaluating order draftability and eligibility', { orderId });
 
-    // Mock order resolution for local/test store environment
-    // In live Wix runtime, this queries Wix eCommerce Orders API / Get Order Draftability Status
+    // Use demo data only for the explicitly seeded preview site. Real site
+    // orders must come from Wix so we never email a synthetic customer address.
     const mockOrderDatabase: Record<string, any> = {
       'wix-order-1001': {
         id: 'wix-order-1001',
@@ -88,37 +93,53 @@ export class OrderService {
       },
     };
 
-    // If order is not in demo db, generate standard mock order so any order ID tested in Thank You page works seamlessly
-    const order = mockOrderDatabase[orderId] || {
-      id: orderId,
-      number: `#${orderId.replace(/[^0-9]/g, '').slice(-4) || '2049'}`,
-      createdDate: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-      status: 'INITIALIZED',
-      paymentStatus: 'PAID',
-      fulfillmentStatus: 'NOT_FULFILLED',
-      currency: 'USD',
-      totals: {
-        subtotal: 45.0,
-        tax: 3.6,
-        shipping: 0,
-        total: 48.6,
-      },
-      buyerInfo: {
-        email: 'customer@example.com',
-        id: `guest_${orderId.slice(0, 8)}`,
-      },
-      hasSubscription: false,
-      lineItems: [
-        {
-          id: `orig-line-${orderId}-1`,
-          productName: { original: 'Premium Everyday Goods' },
-          quantity: 1,
-          price: { amount: '45.00' },
-          productId: 'prod-demo-01',
-          image: { url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300&auto=format&fit=crop&q=80' },
+    let order: any;
+    if (siteId === 'default-site') {
+      order = mockOrderDatabase[orderId] || {
+        id: orderId,
+        number: `#${orderId.replace(/[^0-9]/g, '').slice(-4) || '2049'}`,
+        createdDate: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+        status: 'INITIALIZED',
+        paymentStatus: 'PAID',
+        fulfillmentStatus: 'NOT_FULFILLED',
+        currency: 'USD',
+        totals: {
+          subtotal: 45.0,
+          tax: 3.6,
+          shipping: 0,
+          total: 48.6,
         },
-      ],
-    };
+        buyerInfo: {
+          email: 'customer@example.com',
+          id: `guest_${orderId.slice(0, 8)}`,
+        },
+        hasSubscription: false,
+        lineItems: [
+          {
+            id: `orig-line-${orderId}-1`,
+            productName: { original: 'Premium Everyday Goods' },
+            quantity: 1,
+            price: { amount: '45.00' },
+            productId: 'prod-demo-01',
+            image: { url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=300&auto=format&fit=crop&q=80' },
+          },
+        ],
+      };
+    } else {
+      try {
+        order = await getOrder(orderId);
+      } catch (error: any) {
+        logger.warn('Could not retrieve Wix order; skipping session initialization', {
+          orderId,
+          siteId,
+          error: error?.message,
+        });
+        return {
+          draftable: false,
+          reason: 'The order could not be retrieved from Wix. Please try again later.',
+        };
+      }
+    }
 
     // Validate payment status
     if (['CANCELED', 'FULLY_REFUNDED', 'PARTIALLY_REFUNDED'].includes(order.paymentStatus)) {
@@ -144,23 +165,31 @@ export class OrderService {
       };
     }
 
-    const lineItems: OrderLineItem[] = (order.lineItems || []).map((item: any) => ({
-      id: item.id,
+    const lineItems: OrderLineItem[] = (order.lineItems || []).map((item: any, index: number) => ({
+      id: item._id || item.id || `${orderId}-line-${index}`,
       name: item.productName?.original || 'Item',
       quantity: item.quantity,
       price: parseFloat(item.price?.amount || '0'),
       currency: order.currency || 'USD',
-      productId: item.productId,
-      image: item.image?.url,
+      productId: item.catalogReference?.catalogItemId || item.productId,
+      image: typeof item.image === 'string' ? item.image : item.image?.url,
       isOriginal: true,
     }));
 
+    const orderDigits = String(order.number ?? '').replace(/\D/g, '');
+    const orderNumber = orderDigits && Number(orderDigits) > 0
+      ? `#${orderDigits}`
+      : `#${orderId.replace(/\D/g, '').slice(-4) || '1001'}`;
+    const createdDate = order._createdDate || order.createdDate;
+    const createdAt = createdDate ? new Date(createdDate).toISOString() : new Date().toISOString();
+    const total = order.priceSummary?.total?.amount ?? order.totals?.total;
+
     return {
       draftable: true,
-      orderNumber: order.number,
-      orderCreatedAt: order.createdDate,
+      orderNumber,
+      orderCreatedAt: createdAt,
       lineItems,
-      orderTotal: order.totals?.total || 0,
+      orderTotal: Number(total) || 0,
       currency: order.currency || 'USD',
       customerEmail: order.buyerInfo?.email,
     };

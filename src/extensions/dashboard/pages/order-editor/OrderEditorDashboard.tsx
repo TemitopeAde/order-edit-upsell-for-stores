@@ -25,7 +25,10 @@ import {
   Send,
 } from 'lucide-react';
 import { httpClient } from '@wix/essentials';
+import { dashboard } from '@wix/dashboard';
 import { I18nProvider, useTranslation, LanguageSelector } from '../../../../i18n/I18nContext';
+
+const SITE_PLUGIN_ID = '2504a718-ca95-4e95-b972-6786417e40c0';
 
 const getApiUrl = (path: string): string => {
   try {
@@ -47,6 +50,11 @@ const OrderEditorDashboardContent: React.FC = () => {
   const [orders, setOrders] = useState<OrderEditSession[]>([]);
   const [payments, setPayments] = useState<OrderPaymentAdjustment[]>([]);
   const [statusChecklist, setStatusChecklist] = useState<any[]>([]);
+  const [storesInstalled, setStoresInstalled] = useState<boolean | null>(null);
+  const [pluginPlaced, setPluginPlaced] = useState<boolean | null>(null);
+  const [pluginStatusError, setPluginStatusError] = useState<string | null>(null);
+  const [checkingPluginPlacement, setCheckingPluginPlacement] = useState(false);
+  const [placingPlugin, setPlacingPlugin] = useState(false);
 
   // Filtering & Modal states
   const [orderSearch, setOrderSearch] = useState('');
@@ -57,6 +65,48 @@ const OrderEditorDashboardContent: React.FC = () => {
 
   // Settings form local state
   const [formSettings, setFormSettings] = useState<Partial<OrderEditorSettings>>({});
+
+  const applyStatusResponse = (statusResponse: any) => {
+    setStatusChecklist(statusResponse.checklist || []);
+    setPluginPlaced(
+      typeof statusResponse.pluginPlacement?.placedInSlot === 'boolean'
+        ? statusResponse.pluginPlacement.placedInSlot
+        : null,
+    );
+    setPluginStatusError(statusResponse.pluginPlacement?.error || null);
+  };
+
+  const loadPluginPlacementStatus = async () => {
+    setCheckingPluginPlacement(true);
+    try {
+      const response = await httpClient.fetchWithAuth(getApiUrl('/api/dashboard/status'));
+      if (!response.ok) {
+        throw new Error('Failed to load plugin placement status');
+      }
+      applyStatusResponse(await response.json());
+    } catch (err) {
+      console.error('Failed to load plugin placement status:', err);
+      setPluginStatusError(err instanceof Error ? err.message : 'Failed to load plugin placement status');
+    } finally {
+      setCheckingPluginPlacement(false);
+    }
+  };
+
+  const loadAppInstance = async () => {
+    try {
+      const response = await httpClient.fetchWithAuth(getApiUrl('/api/dashboard/instance'));
+      if (!response.ok) {
+        throw new Error('Failed to load app instance');
+      }
+      const appInstance = await response.json();
+      const installedWixApps = appInstance.site?.installedWixApps;
+      if (Array.isArray(installedWixApps)) {
+        setStoresInstalled(installedWixApps.includes('stores'));
+      }
+    } catch (err) {
+      console.error('Failed to load app instance:', err);
+    }
+  };
 
   const loadAllData = async () => {
     try {
@@ -86,8 +136,7 @@ const OrderEditorDashboardContent: React.FC = () => {
         setPayments(p.adjustments || []);
       }
       if (statusRes.ok) {
-        const st = await statusRes.json();
-        setStatusChecklist(st.checklist || []);
+        applyStatusResponse(await statusRes.json());
       }
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
@@ -97,8 +146,22 @@ const OrderEditorDashboardContent: React.FC = () => {
     }
   };
 
+  const handlePlacePlugin = async () => {
+    setPlacingPlugin(true);
+    try {
+      await dashboard.addSitePlugin(SITE_PLUGIN_ID, {});
+      await loadPluginPlacementStatus();
+    } catch (err: any) {
+      console.error('Failed to place site plugin:', err);
+      alert(err?.message || 'Wix could not place the plugin. Please open the Thank You page in the Wix Editor and try again.');
+    } finally {
+      setPlacingPlugin(false);
+    }
+  };
+
   useEffect(() => {
     loadAllData();
+    loadAppInstance();
   }, []);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -325,6 +388,28 @@ const OrderEditorDashboardContent: React.FC = () => {
             </button>
           </div>
         </header>
+
+        {storesInstalled === false && (
+          <div
+            role="status"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '14px 18px',
+              marginBottom: '24px',
+              background: '#fff7ed',
+              border: '1px solid #fed7aa',
+              borderRadius: '10px',
+              color: '#9a3412',
+              fontSize: '14px',
+              lineHeight: 1.5,
+            }}
+          >
+            <AlertTriangle size={18} aria-hidden="true" />
+            <span>Wix Stores is not installed on this site. Install Wix Stores to use order editing and upsell features.</span>
+          </div>
+        )}
 
         {saveSuccessMsg && (
           <div style={{
@@ -1015,10 +1100,33 @@ const OrderEditorDashboardContent: React.FC = () => {
         {/* TAB 6: SETUP & CHECKLIST */}
         {activeTab === 'setup' && (
           <div style={{ background: '#ffffff', borderRadius: '16px', border: '1px solid #e2e8f0', padding: '24px', maxWidth: '800px' }}>
-            <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700 }}>{t('setup.title')}</h3>
-            <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#64748b' }}>
-              {t('setup.subtitle')}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <h3 style={{ margin: '0 0 6px', fontSize: '17px', fontWeight: 700 }}>{t('setup.title')}</h3>
+                <p style={{ margin: 0, fontSize: '13px', color: '#64748b' }}>
+                  {t('setup.subtitle')}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={loadPluginPlacementStatus}
+                disabled={checkingPluginPlacement || placingPlugin}
+                style={{
+                  flexShrink: 0,
+                  background: '#ffffff',
+                  color: '#2563eb',
+                  border: '1px solid #bfdbfe',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: checkingPluginPlacement || placingPlugin ? 'not-allowed' : 'pointer',
+                  opacity: checkingPluginPlacement || placingPlugin ? 0.6 : 1,
+                }}
+              >
+                {checkingPluginPlacement ? 'Checking...' : 'Check placement status'}
+              </button>
+            </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {statusChecklist.map((item) => (
@@ -1034,13 +1142,34 @@ const OrderEditorDashboardContent: React.FC = () => {
                   <div style={{ color: item.status === 'COMPLETE' ? '#16a34a' : '#f97316', marginTop: '2px' }}>
                     {item.status === 'COMPLETE' ? <CheckCircle2 size={20} /> : <AlertTriangle size={20} />}
                   </div>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <h4 style={{ margin: '0 0 2px', fontSize: '14px', fontWeight: 700, color: '#0f172a' }}>
                       {item.title}
                     </h4>
                     <p style={{ margin: 0, fontSize: '13px', color: '#475569' }}>
-                      {item.description}
+                      {item.id === 'plugin_placed' && pluginStatusError ? pluginStatusError : item.description}
                     </p>
+                    {item.id === 'plugin_placed' && pluginPlaced === false && !pluginStatusError && (
+                      <button
+                        type="button"
+                        onClick={handlePlacePlugin}
+                        disabled={placingPlugin || checkingPluginPlacement}
+                        style={{
+                          marginTop: '12px',
+                          background: '#2563eb',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '8px 14px',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          cursor: placingPlugin || checkingPluginPlacement ? 'not-allowed' : 'pointer',
+                          opacity: placingPlugin || checkingPluginPlacement ? 0.6 : 1,
+                        }}
+                      >
+                        {placingPlugin ? 'Placing plugin...' : 'Place plugin'}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

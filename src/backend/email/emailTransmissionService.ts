@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { emailTransmissions } from '@wix/email-transmissions';
 import { auth } from '@wix/essentials';
 import { logger } from '../logger';
@@ -310,7 +311,8 @@ export class EmailTransmissionService {
     });
 
     const senderDisplayName = settings.emailSenderName || settings.appearance?.widgetTitle || 'Order Support';
-    const idempotencyKey = `edit-notify-${orderId.replace(/[^a-zA-Z0-9-]/g, '')}-${Date.now().toString(36)}`;
+    // Wix requires this option to be a GUID (not an arbitrary request label).
+    const idempotencyKey = randomUUID();
 
     let transmissionId: string | undefined;
     let isSimulated = false;

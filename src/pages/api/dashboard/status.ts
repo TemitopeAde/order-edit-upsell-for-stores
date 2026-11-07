@@ -1,5 +1,9 @@
 import type { APIRoute } from 'astro';
+import { auth } from '@wix/essentials';
+import { plugins } from '@wix/site-plugins';
 import { WixDataRepository } from '@/backend/db/wixDataRepository';
+
+const SITE_PLUGIN_ID = '2504a718-ca95-4e95-b972-6786417e40c0';
 
 export const GET: APIRoute = async ({ request }) => {
   const url = new URL(request.url);
@@ -8,6 +12,19 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     const repo = new WixDataRepository(siteId);
     const settings = await repo.getSettings();
+
+    let pluginPlaced = false;
+    let pluginStatusError: string | undefined;
+    try {
+      const getPlacementStatus = auth.elevate(plugins.getPlacementStatus);
+      const placementStatus = await getPlacementStatus();
+      pluginPlaced = placementStatus.placementStatuses?.some(
+        (status) => status.pluginId === SITE_PLUGIN_ID && status.placedInSlot,
+      ) ?? false;
+    } catch (error: any) {
+      pluginStatusError = error?.message || 'Unable to read site plugin placement status.';
+      console.error('Failed to read site plugin placement status:', error);
+    }
 
     const checklist = [
       {
@@ -27,8 +44,12 @@ export const GET: APIRoute = async ({ request }) => {
       {
         id: 'plugin_placed',
         title: 'Thank You Page Site Plugin Placement',
-        description: 'Site plugin registered for slot ID 55240cc6-0b87-4657-b626-88b90915151e (after items).',
-        status: 'COMPLETE',
+        description: pluginStatusError
+          ? pluginStatusError
+          : pluginPlaced
+            ? 'Site plugin is placed on the Thank You page.'
+            : 'Site plugin is not placed on the Thank You page yet.',
+        status: pluginStatusError ? 'WARNING' : pluginPlaced ? 'COMPLETE' : 'WARNING',
         required: true,
       },
       {
@@ -55,9 +76,14 @@ export const GET: APIRoute = async ({ request }) => {
     ];
 
     return new Response(JSON.stringify({
-      ready: true,
-      allRequiredComplete: true,
+      ready: checklist.every((item) => !item.required || item.status === 'COMPLETE'),
+      allRequiredComplete: checklist.every((item) => !item.required || item.status === 'COMPLETE'),
       checklist,
+      pluginPlacement: {
+        pluginId: SITE_PLUGIN_ID,
+        placedInSlot: pluginPlaced,
+        error: pluginStatusError,
+      },
       settings,
     }), {
       status: 200,

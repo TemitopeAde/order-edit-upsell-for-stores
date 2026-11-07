@@ -5,7 +5,7 @@ export default extensions.dashboardPage({
   title: 'Order Editor & Upsell',
   routePath: '',
   component: './extensions/dashboard/pages/order-editor/OrderEditorDashboard.tsx',
-  fullPage: true,
+  fullPage: false,
   metaData: {
     searchable: true,
     description: 'Manage post-purchase order editing, customer additions, deadlines, and payment requests.',
